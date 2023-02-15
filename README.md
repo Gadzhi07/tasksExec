@@ -11,6 +11,7 @@ Launch: `taskexec [countReadingMails: int (default = 5)] [delLogs: bool (0/1) (d
 Example: `taskexec 7 0`
 
 `countReadingMails` - number of emails to be read
+
 `delLogs` - if 1 (true) deleting logs will be enabled else if 0 (false) disabled
 
 I made this with code from [rocShell](https://github.com/rocketorbit/rocShell) and FortenZz#2561 helped me.
