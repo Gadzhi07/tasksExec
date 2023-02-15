@@ -21,4 +21,7 @@ Example: `taskexec 7 0`
 - you can choose the tasks that will be completed
 - good code
 
+## TODO:
+- If the user is Any, then when changing the password, return the changed password.
+
 I made this with code from [rocShell](https://github.com/rocketorbit/rocShell) and FortenZz#2561 helped me.
