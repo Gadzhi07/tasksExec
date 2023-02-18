@@ -193,7 +193,7 @@ Hack = function(IP, PORT, injectArg = "madeinRussia")
             result = metaLib.overflow(mem, value, injectArg)
             
             if not result then continue
-            if typeof(result) == "file" or typeof(result) == "computer" or typeof(result) == "file" then results.push(result)
+            if typeof(result) == "file" or typeof(result) == "computer" or typeof(result) == "shell" then results.push(result)
         end for
     end for
     return results
