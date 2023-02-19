@@ -21,6 +21,17 @@ Example: `taskexec 7 0`
 - you can choose the tasks that will be completed
 - good code
 
+## Mailsender
+Python script in the `mailsender` folder that automatically sends emails with passwords.
+
+Install python and [pyautogui](https://pypi.org/project/PyAutoGUI/).
+
+In order for it to work, run GreyHack and open it `Mail.exe`.
+
+Next, in the `mailsender` folder, replace all screenshots and the `TaskExec.log` file with your own.
+
+Then you can run the script `mailsender.py`.
+
 ## TODO:
 - If the user is Any, then when changing the password, return the changed password.
 
