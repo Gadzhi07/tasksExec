@@ -35,4 +35,4 @@ Then you can run the script `mailsender.py`.
 ## TODO:
 - If the user is Any, then when changing the password, return the changed password.
 
-I made this with code from [rocShell](https://github.com/rocketorbit/rocShell) and FortenZz#2561 helped me.
+I made this with code from [rocShell](https://github.com/rocketorbit/rocShell), FortenZz#2561 and Skydr0w#8915 helped me.
