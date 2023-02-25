@@ -4,54 +4,79 @@
 // countReadingMails - number of emails to be read
 // delLogs - if 1 (true) deleting logs will be enabled else if 0 (false) disabled
 
-if len(params) == 1 and (params[0] == "-h" or params[0] == "--help") then exit("Usage: \n" + program_path.split("/")[-1] + " [countReadingMails: int (default = 5)] [delLogs: bool (0/1) (default = 1)]\nExample: taskexec 7 0")
-countReadingMails = 5
-if len(params) >= 1 then countReadingMails = params[0].to_int()
-delLogs = true
-if len(params) >= 2 then delLogs = params[1].to_int()
+if len(params) == 1 and (params[0] == "-h" or params[0] == "--help") then exit("Usage: \n" + program_path.split("/")[-1] + " [countReadingMails: int (default = 100)] [delLogs: bool (0/1) (default = 1)]\nExample: taskexec 7 0")
+globals.countReadingMails = 100
+if len(params) >= 1 then globals.countReadingMails = params[0].to_int()
+globals.delLogs = true
+if len(params) >= 2 then globals.delLogs = params[1].to_int()
 
 local = {}
 local.computer = get_shell.host_computer
 
-// [{"mail_number": mail_number, "ip": ip, "lan": lan, "user": user, "pass": pass}]
 program_results = []
 
 if not local.computer.is_network_active then
     exit("Network is not active.")
 end if
 
-changePerms = function(fileObject)
-    libFile = getFile(fileObject, "/lib")
-    if libFile then
-        libFile.chmod("o+wrx",1)
-        libFile.chmod("u+wrx",1)
-        libFile.chmod("g+wrx",1)
-        libFile.set_owner("guest", 1)
-    end if
-    
-    binFile = getFile(fileObject, "/bin")
-    if binFile then
-        binFile.chmod("g+wrx", 1)
-        binFile.chmod("o+wrx", 1)
-        binFile.chmod("u+wrx", 1)
-        binFile.set_owner("guest", 1)
-    end if
 
-    etcFile = getFile(fileObject, "/etc")
-    if etcFile then
-        etcFile.chmod("o+wrx",1)
-        etcFile.chmod("u+wrx",1)
-        etcFile.chmod("g+wrx",1)
-        etcFile.set_owner("guest", 1)
-    end if
+SetAsGuest = function(fileObject)
+    FinFileSubFolder=function(folders)
+        for folder in folders.get_folders
+            mods = ["o+rwx","g+rwx","u+rwx"]
+            for mod in mods
+                s = folder.chmod(mod,1)
+            end for
+            folder.set_owner("guest")
+            folder.set_group("guest")
+            for filexcut in folder.get_files
+                mods = ["o+rwx","g+rwx","u+rwx"]
+                for mod in mods
+                    s = filexcut.chmod(mod,1)
+                end for
+                filexcut.set_owner("guest")
+                filexcut.set_group("guest")
+            end for
+            FinFileSubFolder(folder)
+        end for
+    end function
+    mods = ["o+rwx","g+rwx","u+rwx"]
+    for mod in mods
+        fileObject.chmod(mod,1)
+    end for
+    for filexcut in fileObject.get_files
+        filexcut.set_owner("guest")
+        filexcut.set_group("guest")
+    end for
+    for folder in fileObject.get_folders
+        folder.set_owner("guest")
+        folder.set_group("guest")
+        for filexcut in folder.get_files
+            filexcut.set_owner("guest")
+            filexcut.set_group("guest")
+        end for
+        FinFileSubFolder(folder)
+    end for
+end function 
 
-    homeFile = getFile(fileObject, "/home")
-    if homeFile then
-        homeFile.chmod("o+wrx",1)
-        homeFile.chmod("u+wrx",1)
-        homeFile.chmod("g+wrx",1)
-        homeFile.set_owner("guest", 1)
-    end if
+checkLan = function(anyObject)
+    if typeof(anyObject) == "shell" then return not anyObject.host_computer.File("/lib/kernel_router.so")
+    if typeof(anyObject) == "computer" then return not anyObject.File("/lib/kernel_router.so")
+    while anyObject.parent
+        anyObject = anyObject.parent
+    end while
+    found = null
+    for folder in anyObject.get_folders
+        if folder.name == "lib" then
+            found = folder
+            break
+        end if
+    end for
+    if not found then return null
+    for file in found.get_files
+        if file.name == "kernel_router.so" then return false
+    end for
+    return true
 end function
 
 allFiles = function(fileObject)
@@ -166,11 +191,13 @@ getPasswordAndClearLogs = function(user, obj)
             end for
         end if
         if not hash_password then return false
-        password = cr.decipher(hash_password)
+        
         if globals.delLogs then
             if typeof(obj) == "computer" then corruptLog(obj)
             if typeof(obj) == "shell" then corruptLog(obj.host_computer)
         end if
+        if hash_password == "ced421b174bd05a560a4f098565d4c7b" then return "madeinRussia"
+        password = cr.decipher(hash_password)
         return password
     end if
 end function
@@ -191,9 +218,13 @@ Hack = function(IP, PORT, injectArg = "madeinRussia")
             value = value.replace("\n", "")
             
             result = metaLib.overflow(mem, value, injectArg)
-            
-            if not result then continue
-            if typeof(result) == "file" or typeof(result) == "computer" or typeof(result) == "shell" then results.push(result)
+            if not result then
+                result = metaLib.overflow(mem, value)
+                if not result then continue
+            end if
+            if (typeof(result) != "shell") and (typeof(result) != "computer") and (typeof(result) != "file") then continue
+            if not checkLan(result) then continue
+            results.push(result)
         end for
     end for
     return results
@@ -226,7 +257,7 @@ hackObjs = function(objs, attack)
     sorted_objs = sortHacked(objs)
     for obj in sorted_objs
         if not obj then continue
-        changePerms(toFile(obj))
+        SetAsGuest(toFile(obj))
         output = getPasswordAndClearLogs(user, obj)
         if typeof(output) == "string" then
             // print and save the information about the attack in a file
@@ -255,7 +286,6 @@ hackMail = function(attack)
     ip = attack.ip
     lan = attack.lan
     mail_number = attack.mail_number
-    
     router = get_router(ip)
     ports = {}
     ports[router.local_ip] = [0]
@@ -267,7 +297,6 @@ hackMail = function(attack)
         print("<color=red>" + mail_number + "</color>: 0 ports")
         return null
     end if
-
     print("<color=red>" + mail_number + "</color>: " + ports[lan].len + " ports")
     for port in ports[lan]      
         objs = Hack(ip, port)
@@ -275,16 +304,17 @@ hackMail = function(attack)
         if hackObjs(objs, attack) then return true
     end for
 
+    print("Bounce attack:\n")
     objs = Hack(router.public_ip, 0, lan)
     if not objs then return false
-    print("Bounce attack:\n")
     if hackObjs(objs, attack) then return true
 end function
 
 main = function()
     targets = []
+    all_missions_id = []
     print("<size=125%><b>FOUND:")
-    mail_number = 0
+    mail_number = -1
     for mail in metamail.fetch
         if mail_number >= globals.countReadingMails then break
         splitMail = mail.split(char(10))
@@ -292,12 +322,15 @@ main = function()
         subj = splitMail[4].split(": ")[1]
         mail = metamail.read(id).replace(char(10)+char(10), "")
         if subj != "Mission Contract" then continue
+        all_missions_id.push(id)
+        mail_number = mail_number + 1
 
         // get ip
         undo_ip_text = "The remote ip of the victim is <b>"
         fir_i = mail.indexOf(undo_ip_text) + undo_ip_text.len()
         sec_i = mail[fir_i:].indexOf("</b>") + fir_i
         ip = mail[fir_i:sec_i]
+        if ip.len() > 15 then continue
 
         //get lan
         lan = null
@@ -305,6 +338,7 @@ main = function()
         fir_i = mail.indexOf(undo_lan_text) + undo_lan_text.len()
         sec_i = mail[fir_i:].indexOf("</b>") + fir_i
         lan = mail[fir_i:sec_i]
+        if lan.len() > 15 then continue
 
         // user (false - any user)
         user = false
@@ -314,6 +348,7 @@ main = function()
             sec_i = mail[fir_i:].indexOf("</b>") + fir_i
             user = mail[fir_i:sec_i]
         end if
+        if user and user.len() > 30 then continue
 
         printUser = user
         if not printUser then printUser = "ANY"
@@ -323,7 +358,6 @@ main = function()
         print("<b>*</b> LAN: <b>" + lan)
         print("<b>*</b> User: <b>" + printUser)
         targets.push({"mail_number": mail_number, "ip": ip, "lan": lan, "user": user})
-        mail_number = mail_number + 1
     end for
     print("------------------------")
 
@@ -344,16 +378,26 @@ main = function()
     end for
 
     print("\n\n\n")
+    count = 0
     for i in globals.program_results
-        printUser = user
+        if i.mail_number > count then
+            while i.mail_number > count
+                metamail.delete(all_missions_id[count])
+                count = count + 1
+            end while
+        end if
+        printUser = i.user
         if not printUser then printUser = "ANY"
         print("-<color=red>"+i.mail_number+"</color>----------------------")
         print("<b>*</b> IP: <b> "+i.ip)
         print("<b>*</b> LAN: <b> "+i.lan)
         print("<b>*</b> User: <b>" + printUser)
         print("<b>*</b> Password:<b><color=red> "+i.pass)
+        count = count + 1
     end for
     print("------------------------")
+    print("<color=red>Restart your <color=#fff>Mail.exe</color>")
+    print("Uncompleted tasks have been removed.")
 end function
 
 // load metaxploit
@@ -377,7 +421,6 @@ for mx_file in cr_finded_files
    end if
 end for
 if not cr then exit("Warning missing lib crypto.so.")
-
 
 // load metamail
 login = null
